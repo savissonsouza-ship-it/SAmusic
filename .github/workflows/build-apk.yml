@@ -20,8 +20,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Aceitar licenças do Android SDK (SDK já vem no runner)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
 
       - name: Injetar JAMENDO_CLIENT_ID
         # Cria local.properties com a chave vinda do segredo do repositório.
