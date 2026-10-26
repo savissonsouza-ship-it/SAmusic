@@ -23,10 +23,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val app = application as SAmusicApp
 
+        // Prefer the local file for downloaded tracks.
+        app.playback.urlResolver = { t ->
+            app.downloads.localUriOrNull(t.id)?.let { local -> t.copy(audioUrl = local) } ?: t
+        }
+
         setContent {
             SAmusicTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SAmusicRoot(repository = app.repository, playback = app.playback)
+                    SAmusicRoot(
+                        repository = app.repository,
+                        playback = app.playback,
+                        downloads = app.downloads,
+                    )
                 }
                 LaunchedEffect(Unit) {
                     app.playback.connect()

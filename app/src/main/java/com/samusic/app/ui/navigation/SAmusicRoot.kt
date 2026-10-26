@@ -28,15 +28,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.samusic.app.data.DownloadManager
 import com.samusic.app.data.repo.MusicRepository
 import com.samusic.app.playback.PlaybackController
 import com.samusic.app.ui.HomeViewModel
 import com.samusic.app.ui.LibraryViewModel
+import com.samusic.app.ui.PlayerViewModel
 import com.samusic.app.ui.SearchViewModel
 import com.samusic.app.ui.SAmusicVMFactory
 import com.samusic.app.ui.components.MiniPlayer
 import com.samusic.app.ui.home.HomeScreen
 import com.samusic.app.ui.library.LibraryScreen
+import com.samusic.app.ui.library.PlaylistDetailScreen
 import com.samusic.app.ui.player.PlayerScreen
 import com.samusic.app.ui.search.SearchScreen
 
@@ -47,14 +50,20 @@ private enum class Dest(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun SAmusicRoot(repository: MusicRepository, playback: PlaybackController) {
-    val factory = remember { SAmusicVMFactory(repository, playback) }
+fun SAmusicRoot(
+    repository: MusicRepository,
+    playback: PlaybackController,
+    downloads: DownloadManager,
+) {
+    val factory = remember { SAmusicVMFactory(repository, playback, downloads) }
     val homeVm: HomeViewModel = viewModel(factory = factory)
     val searchVm: SearchViewModel = viewModel(factory = factory)
     val libraryVm: LibraryViewModel = viewModel(factory = factory)
+    val playerVm: PlayerViewModel = viewModel(factory = factory)
 
     var dest by rememberSaveable { mutableStateOf(Dest.HOME) }
     var playerExpanded by remember { mutableStateOf(false) }
+    var openPlaylistId by rememberSaveable { mutableStateOf<Long?>(null) }
     val playerState by playback.state.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
@@ -80,7 +89,25 @@ fun SAmusicRoot(repository: MusicRepository, playback: PlaybackController) {
             when (dest) {
                 Dest.HOME -> HomeScreen(homeVm, padding)
                 Dest.SEARCH -> SearchScreen(searchVm, padding)
-                Dest.LIBRARY -> LibraryScreen(libraryVm, padding)
+                Dest.LIBRARY -> LibraryScreen(libraryVm, padding, onOpenPlaylist = { openPlaylistId = it })
+            }
+        }
+
+        // Playlist detail overlay.
+        AnimatedVisibility(
+            visible = openPlaylistId != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it })
+        ) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                openPlaylistId?.let { id ->
+                    PlaylistDetailScreen(
+                        repository = repository,
+                        playback = playback,
+                        playlistId = id,
+                        onBack = { openPlaylistId = null }
+                    )
+                }
             }
         }
 
@@ -94,7 +121,7 @@ fun SAmusicRoot(repository: MusicRepository, playback: PlaybackController) {
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                PlayerScreen(controller = playback, onCollapse = { playerExpanded = false })
+                PlayerScreen(controller = playback, actions = playerVm, onCollapse = { playerExpanded = false })
             }
         }
     }

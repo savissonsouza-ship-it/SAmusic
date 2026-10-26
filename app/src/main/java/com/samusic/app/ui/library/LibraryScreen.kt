@@ -1,5 +1,6 @@
 package com.samusic.app.ui.library
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -33,14 +35,21 @@ import androidx.compose.ui.unit.dp
 import com.samusic.app.ui.LibraryViewModel
 import com.samusic.app.ui.components.TrackRow
 
-private enum class Tab(val label: String) { FAVORITES("Favoritos"), PLAYLISTS("Playlists"), HISTORY("Histórico") }
+private enum class Tab(val label: String) {
+    FAVORITES("Favoritos"), PLAYLISTS("Playlists"), DOWNLOADS("Downloads"), HISTORY("Histórico")
+}
 
 @Composable
-fun LibraryScreen(vm: LibraryViewModel, contentPadding: PaddingValues) {
+fun LibraryScreen(
+    vm: LibraryViewModel,
+    contentPadding: PaddingValues,
+    onOpenPlaylist: (Long) -> Unit,
+) {
     var tab by remember { mutableStateOf(Tab.FAVORITES) }
     val favorites by vm.favorites.collectAsState()
     val history by vm.history.collectAsState()
     val playlists by vm.playlists.collectAsState()
+    val downloaded by vm.downloaded.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
@@ -56,6 +65,25 @@ fun LibraryScreen(vm: LibraryViewModel, contentPadding: PaddingValues) {
         when (tab) {
             Tab.FAVORITES -> TrackList(favorites, "Nenhuma música favoritada ainda.") { vm.play(favorites, it) }
             Tab.HISTORY -> TrackList(history, "Seu histórico aparecerá aqui.") { vm.play(history, it) }
+            Tab.DOWNLOADS -> {
+                if (downloaded.isEmpty()) {
+                    EmptyState("Nenhuma música baixada. Toque uma faixa e use o botão de download no player.")
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(downloaded, key = { it.id }) { track ->
+                            TrackRow(
+                                track = track,
+                                onClick = { vm.play(downloaded, track) },
+                                trailing = {
+                                    IconButton(onClick = { vm.deleteDownload(track.id) }) {
+                                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Remover download")
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
             Tab.PLAYLISTS -> Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Suas playlists", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -69,7 +97,10 @@ fun LibraryScreen(vm: LibraryViewModel, contentPadding: PaddingValues) {
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(playlists, key = { it.playlistId }) { p ->
                             Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenPlaylist(p.playlistId) }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {

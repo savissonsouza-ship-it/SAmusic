@@ -40,6 +40,9 @@ class PlaybackController(context: Context) {
 
     var onTrackStarted: ((Track) -> Unit)? = null
 
+    /** Swaps a track's audio URL for a local file when it has been downloaded. */
+    var urlResolver: (Track) -> Track = { it }
+
     fun connect() {
         if (controller != null) return
         val token = SessionToken(appContext, ComponentName(appContext, MusicService::class.java))
@@ -88,7 +91,7 @@ class PlaybackController(context: Context) {
         val c = controller ?: return
         if (tracks.isEmpty()) return
         queue = tracks
-        c.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
+        c.setMediaItems(tracks.map { urlResolver(it).toMediaItem() }, startIndex, 0L)
         c.prepare()
         c.play()
         queue.getOrNull(startIndex)?.let { onTrackStarted?.invoke(it) }

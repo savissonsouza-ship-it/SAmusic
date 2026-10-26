@@ -11,14 +11,16 @@ import androidx.room.RoomDatabase
         PlaylistEntity::class,
         PlaylistTrackEntity::class,
         HistoryEntity::class,
+        DownloadEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun playlistDao(): PlaylistDao
     abstract fun historyDao(): HistoryDao
+    abstract fun downloadDao(): DownloadDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

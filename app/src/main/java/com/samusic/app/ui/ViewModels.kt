@@ -3,15 +3,20 @@ package com.samusic.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.samusic.app.data.DownloadManager
 import com.samusic.app.data.Track
 import com.samusic.app.data.local.PlaylistEntity
 import com.samusic.app.data.repo.MusicRepository
 import com.samusic.app.data.repo.Outcome
 import com.samusic.app.playback.PlaybackController
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -122,6 +127,7 @@ class SearchViewModel(
 class LibraryViewModel(
     private val repo: MusicRepository,
     val playback: PlaybackController,
+    private val downloads: DownloadManager,
 ) : ViewModel() {
 
     val favorites: StateFlow<List<Track>> =
@@ -133,12 +139,17 @@ class LibraryViewModel(
     val playlists: StateFlow<List<PlaylistEntity>> =
         repo.playlists().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val downloaded: StateFlow<List<Track>> =
+        downloads.downloaded().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch { repo.createPlaylist(name.trim(), "") }
     }
 
     fun deletePlaylist(id: Long) = viewModelScope.launch { repo.deletePlaylist(id) }
+
+    fun deleteDownload(id: String) = viewModelScope.launch { downloads.delete(id) }
 
     fun play(tracks: List<Track>, start: Track) {
         val idx = tracks.indexOfFirst { it.id == start.id }.coerceAtLeast(0)
@@ -147,16 +158,65 @@ class LibraryViewModel(
     }
 }
 
+/** Actions for the full-screen player: favorite, download, add to playlist. */
+@OptIn(ExperimentalCoroutinesApi::class)
+class PlayerViewModel(
+    private val repo: MusicRepository,
+    val playback: PlaybackController,
+    private val downloads: DownloadManager,
+) : ViewModel() {
+
+    val playlists: StateFlow<List<PlaylistEntity>> =
+        repo.playlists().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val isFavorite: StateFlow<Boolean> =
+        playback.state.flatMapLatest { st ->
+            st.current?.let { repo.isFavorite(it.id) } ?: flowOf(false)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isDownloaded: StateFlow<Boolean> =
+        playback.state.flatMapLatest { st ->
+            st.current?.let { downloads.isDownloaded(it.id) } ?: flowOf(false)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private val _downloading = MutableStateFlow(false)
+    val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
+
+    fun toggleFavorite() {
+        val t = playback.state.value.current ?: return
+        viewModelScope.launch {
+            val fav = repo.isFavorite(t.id).first()
+            repo.toggleFavorite(t, !fav)
+        }
+    }
+
+    fun download() {
+        val t = playback.state.value.current ?: return
+        viewModelScope.launch {
+            _downloading.value = true
+            downloads.download(t)
+            _downloading.value = false
+        }
+    }
+
+    fun addToPlaylist(playlistId: Long) {
+        val t = playback.state.value.current ?: return
+        viewModelScope.launch { repo.addToPlaylist(playlistId, t) }
+    }
+}
+
 /** Builds any of the above ViewModels with shared dependencies. */
 class SAmusicVMFactory(
     private val repo: MusicRepository,
     private val playback: PlaybackController,
+    private val downloads: DownloadManager,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T = when {
         modelClass.isAssignableFrom(HomeViewModel::class.java) -> HomeViewModel(repo, playback) as T
         modelClass.isAssignableFrom(SearchViewModel::class.java) -> SearchViewModel(repo, playback) as T
-        modelClass.isAssignableFrom(LibraryViewModel::class.java) -> LibraryViewModel(repo, playback) as T
+        modelClass.isAssignableFrom(LibraryViewModel::class.java) -> LibraryViewModel(repo, playback, downloads) as T
+        modelClass.isAssignableFrom(PlayerViewModel::class.java) -> PlayerViewModel(repo, playback, downloads) as T
         else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
     }
 }

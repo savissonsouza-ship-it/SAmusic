@@ -38,14 +38,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.media3.common.Player
 import com.samusic.app.playback.PlaybackController
+import com.samusic.app.ui.PlayerViewModel
 import com.samusic.app.ui.components.Artwork
 import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
     controller: PlaybackController,
+    actions: PlayerViewModel,
     onCollapse: () -> Unit,
 ) {
     val state by controller.state.collectAsState()
@@ -101,7 +111,10 @@ fun PlayerScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
+        PlayerActions(actions, enabled = track != null)
+
+        Spacer(Modifier.height(16.dp))
         val dur = state.durationMs.coerceAtLeast(1).toFloat()
         val pos = if (scrubbing) scrubValue else state.positionMs.toFloat()
         Slider(
@@ -168,4 +181,63 @@ fun PlayerScreen(
 private fun formatMs(ms: Long): String {
     val total = (ms / 1000).toInt().coerceAtLeast(0)
     return "%d:%02d".format(total / 60, total % 60)
+}
+
+@Composable
+private fun PlayerActions(vm: PlayerViewModel, enabled: Boolean) {
+    val isFav by vm.isFavorite.collectAsState()
+    val isDownloaded by vm.isDownloaded.collectAsState()
+    val downloading by vm.downloading.collectAsState()
+    val playlists by vm.playlists.collectAsState()
+    var showPicker by remember { mutableStateOf(false) }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = { vm.toggleFavorite() }, enabled = enabled) {
+            Icon(
+                if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = "Favoritar",
+                tint = if (isFav) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = { if (!isDownloaded) vm.download() }, enabled = enabled && !downloading) {
+            when {
+                downloading -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                isDownloaded -> Icon(Icons.Filled.DownloadDone, contentDescription = "Baixado",
+                    tint = MaterialTheme.colorScheme.primary)
+                else -> Icon(Icons.Filled.Download, contentDescription = "Baixar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        IconButton(onClick = { showPicker = true }, enabled = enabled) {
+            Icon(Icons.Filled.PlaylistAdd, contentDescription = "Adicionar à playlist",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text("Adicionar à playlist") },
+            text = {
+                if (playlists.isEmpty()) {
+                    Text("Você ainda não tem playlists. Crie uma na aba Biblioteca.")
+                } else {
+                    Column {
+                        playlists.forEach { p ->
+                            TextButton(onClick = { vm.addToPlaylist(p.playlistId); showPicker = false }) {
+                                Text(p.name)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Fechar") }
+            }
+        )
+    }
 }
