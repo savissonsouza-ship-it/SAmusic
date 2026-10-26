@@ -21,10 +21,10 @@ import okhttp3.Request
 import java.io.File
 
 /**
- * Offline downloads of Creative Commons tracks. Audio is fetched from the
- * Jamendo download URL (or the stream URL as fallback) and stored in the app's
- * private files dir; the DB keeps the metadata so the offline library survives
- * restarts. Playback prefers the local file when a track is downloaded.
+ * Offline downloads. Audio is fetched from the track's download/stream URL and
+ * stored in the app's private files dir; the DB keeps the metadata so the
+ * offline library survives restarts. Playback prefers the local file when a
+ * track is downloaded.
  */
 class DownloadManager(
     context: Context,

@@ -76,7 +76,7 @@ fun Centered(padding: PaddingValues, content: @Composable () -> Unit) {
 fun MissingKeyNotice(padding: PaddingValues) {
     Box(Modifier.fillMaxSize().padding(padding).padding(24.dp), contentAlignment = Alignment.Center) {
         Text(
-            "Configuração necessária: adicione seu JAMENDO_CLIENT_ID em local.properties para carregar o catálogo. Veja o README.",
+            "Não foi possível carregar o catálogo agora. Verifique sua conexão e tente novamente.",
             style = MaterialTheme.typography.bodyLarge
         )
     }

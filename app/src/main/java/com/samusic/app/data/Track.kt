@@ -1,7 +1,5 @@
 package com.samusic.app.data
 
-import com.samusic.app.data.remote.dto.TrackDto
-
 /** Clean domain model used across UI and playback. */
 data class Track(
     val id: String,
@@ -12,9 +10,9 @@ data class Track(
     val audioUrl: String,
     val durationSeconds: Int,
     val year: String?,
-    val source: String = "Jamendo (Creative Commons)",
+    val source: String = "Audius",
     val isLocal: Boolean = false,
-    // CC download URL when the license permits offline storage (null otherwise).
+    // URL used to fetch the audio for offline storage (defaults to the stream URL).
     val downloadUrl: String? = null,
 ) {
     val durationLabel: String
@@ -23,19 +21,4 @@ data class Track(
             val s = durationSeconds % 60
             return "%d:%02d".format(m, s)
         }
-}
-
-fun TrackDto.toTrack(): Track? {
-    val url = audio?.takeIf { it.isNotBlank() } ?: return null
-    return Track(
-        id = id,
-        title = name ?: "Sem título",
-        artist = artistName ?: "Artista desconhecido",
-        album = albumName ?: "",
-        artworkUrl = (albumImage ?: image)?.takeIf { it.isNotBlank() },
-        audioUrl = url,
-        durationSeconds = duration ?: 0,
-        year = releaseDate?.take(4)?.takeIf { it.isNotBlank() },
-        downloadUrl = audioDownload?.takeIf { it.isNotBlank() },
-    )
 }

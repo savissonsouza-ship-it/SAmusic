@@ -33,9 +33,10 @@ import com.samusic.app.ui.components.TrackRow
 import com.samusic.app.ui.home.Centered
 import com.samusic.app.ui.home.MissingKeyNotice
 
+// Audius genre names (as the API expects them).
 private val genres = listOf(
-    "pop", "rock", "metal", "hiphop", "rnb", "jazz", "blues", "classical",
-    "electronic", "lounge", "reggae", "soundtrack", "instrumental", "world"
+    "Electronic", "Hip-Hop/Rap", "Pop", "Rock", "Metal", "R&B/Soul", "Jazz",
+    "Blues", "Classical", "Reggae", "Ambient", "World", "Soundtrack", "Country"
 )
 
 @OptIn(ExperimentalLayoutApi::class)

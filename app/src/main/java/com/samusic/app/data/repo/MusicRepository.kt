@@ -1,6 +1,5 @@
 package com.samusic.app.data.repo
 
-import com.samusic.app.BuildConfig
 import com.samusic.app.data.Track
 import com.samusic.app.data.local.AppDatabase
 import com.samusic.app.data.local.FavoriteEntity
@@ -9,8 +8,8 @@ import com.samusic.app.data.local.PlaylistEntity
 import com.samusic.app.data.local.PlaylistTrackEntity
 import com.samusic.app.data.local.toColumns
 import com.samusic.app.data.local.toTrack
-import com.samusic.app.data.remote.JamendoApi
-import com.samusic.app.data.toTrack
+import com.samusic.app.data.remote.AudiusApi
+import com.samusic.app.data.remote.dto.AudiusTrack
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,38 +21,69 @@ sealed interface Outcome<out T> {
 const val PAGE_SIZE = 20
 
 class MusicRepository(
-    private val api: JamendoApi,
+    private val api: AudiusApi,
     private val db: AppDatabase,
 ) {
-    private val clientId = BuildConfig.JAMENDO_CLIENT_ID
-    val hasApiKey: Boolean get() = clientId.isNotBlank()
+    // Audius needs no key; kept for compatibility with existing UI state.
+    val hasApiKey: Boolean get() = true
+
+    @Volatile private var cachedHost: String? = null
+
+    private suspend fun host(): String {
+        cachedHost?.let { return it }
+        val list = api.hosts().data
+        val h = list.firstOrNull()?.trimEnd('/')
+            ?: throw Exception("Nenhum servidor Audius disponível no momento")
+        cachedHost = h
+        return h
+    }
+
+    private fun streamUrl(host: String, id: String): String =
+        "$host/v1/tracks/$id/stream?app_name=${AudiusApi.APP_NAME}"
+
+    private fun AudiusTrack.toTrack(host: String): Track? {
+        val tid = id.takeIf { it.isNotBlank() } ?: return null
+        val stream = streamUrl(host, tid)
+        return Track(
+            id = tid,
+            title = title ?: "Sem título",
+            artist = user?.name ?: "Artista desconhecido",
+            album = "",
+            artworkUrl = (artwork?.img480 ?: artwork?.img150)?.takeIf { it.isNotBlank() },
+            audioUrl = stream,
+            durationSeconds = duration ?: 0,
+            year = releaseDate?.take(4)?.takeIf { it.isNotBlank() },
+            source = "Audius",
+            downloadUrl = stream,
+        )
+    }
 
     private inline fun <T> guarded(block: () -> T): Outcome<T> =
-        if (!hasApiKey) Outcome.Error("MISSING_KEY")
-        else try {
+        try {
             Outcome.Success(block())
         } catch (e: Exception) {
             Outcome.Error(e.message ?: "Falha de rede")
         }
 
     suspend fun popular(page: Int): Outcome<List<Track>> = guarded {
-        api.tracks(clientId, limit = PAGE_SIZE, offset = page * PAGE_SIZE, order = "popularity_total")
-            .results.mapNotNull { it.toTrack() }
+        val h = host()
+        api.trending(url = "$h/v1/tracks/trending", limit = PAGE_SIZE, offset = page * PAGE_SIZE)
+            .data.mapNotNull { it.toTrack(h) }
     }
 
-    suspend fun newest(page: Int): Outcome<List<Track>> = guarded {
-        api.tracks(clientId, limit = PAGE_SIZE, offset = page * PAGE_SIZE, order = "releasedate_desc")
-            .results.mapNotNull { it.toTrack() }
-    }
+    suspend fun newest(page: Int): Outcome<List<Track>> = popular(page)
 
     suspend fun search(query: String, page: Int): Outcome<List<Track>> = guarded {
-        api.search(clientId, query = query, limit = PAGE_SIZE, offset = page * PAGE_SIZE)
-            .results.mapNotNull { it.toTrack() }
+        val h = host()
+        // Audius search returns a single batch; paginate client-side.
+        val all = api.search(url = "$h/v1/tracks/search", query = query).data.mapNotNull { it.toTrack(h) }
+        all.drop(page * PAGE_SIZE).take(PAGE_SIZE)
     }
 
     suspend fun byGenre(tag: String, page: Int): Outcome<List<Track>> = guarded {
-        api.byTag(clientId, tag = tag, limit = PAGE_SIZE, offset = page * PAGE_SIZE)
-            .results.mapNotNull { it.toTrack() }
+        val h = host()
+        api.trending(url = "$h/v1/tracks/trending", limit = PAGE_SIZE, offset = page * PAGE_SIZE, genre = tag)
+            .data.mapNotNull { it.toTrack(h) }
     }
 
     // ---- Favorites ----

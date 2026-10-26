@@ -22,16 +22,16 @@ object Network {
             .build()
     }
 
-    fun createApi(): JamendoApi {
+    fun createApi(): AudiusApi {
         val moshi = Moshi.Builder()
             .add(KotlinJsonAdapterFactory())
             .build()
 
         return Retrofit.Builder()
-            .baseUrl(JamendoApi.BASE_URL)
+            .baseUrl(AudiusApi.BASE_URL)
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
-            .create(JamendoApi::class.java)
+            .create(AudiusApi::class.java)
     }
 }
