@@ -30,9 +30,22 @@ android {
         buildConfigField("String", "JAMENDO_CLIENT_ID", "\"$jamendoClientId\"")
     }
 
+    signingConfigs {
+        create("samusic") {
+            // Fixed key so the signing SHA-1 is stable (required by the Spotify dashboard).
+            storeFile = file("../keystore/samusic-debug.keystore")
+            storePassword = "samusic123"
+            keyAlias = "samusic"
+            keyPassword = "samusic123"
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("samusic")
+        }
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("samusic")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
