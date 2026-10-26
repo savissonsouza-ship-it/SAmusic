@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">SAmusic</string>
+    <string name="nav_home">Início</string>
+    <string name="nav_search">Buscar</string>
+    <string name="nav_library">Biblioteca</string>
+    <string name="player_channel_name">Reprodução</string>
+    <string name="missing_key_title">Configuração necessária</string>
+    <string name="missing_key_body">Adicione seu JAMENDO_CLIENT_ID em local.properties para carregar o catálogo. Veja o README.</string>
+</resources>

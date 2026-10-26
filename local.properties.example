@@ -1,0 +1,6 @@
+# Adicione sua chave do Jamendo aqui (NAO versione este arquivo)
+# Obtenha em https://devportal.jamendo.com/
+JAMENDO_CLIENT_ID=
+
+# Caminho do SDK do Android (o Android Studio preenche automaticamente)
+# sdk.dir=/Users/voce/Library/Android/sdk
