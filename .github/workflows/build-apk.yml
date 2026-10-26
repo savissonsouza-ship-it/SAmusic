@@ -5,7 +5,11 @@ name: Build SAmusic APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore: [ 'ci-logs/**' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -24,23 +28,31 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
 
       - name: Injetar JAMENDO_CLIENT_ID
-        # Cria local.properties com a chave vinda do segredo do repositório.
-        # (Settings > Secrets and variables > Actions > New repository secret > JAMENDO_CLIENT_ID)
-        # Sem o segredo, o app compila mesmo assim e mostra "Configuração necessária".
         run: echo "JAMENDO_CLIENT_ID=${{ secrets.JAMENDO_CLIENT_ID }}" > local.properties
 
       - name: Dar permissão ao gradlew
         run: chmod +x ./gradlew
 
-      - name: Rodar testes unitários
-        run: ./gradlew test --stacktrace
-
-      - name: Compilar APK de depuração
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Compilar (testes + APK de depuração)
+        run: |
+          set -o pipefail
+          (./gradlew test assembleDebug --stacktrace --no-daemon 2>&1) | tee build-out.txt
 
       - name: Publicar o APK como artefato
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SAmusic-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Em caso de falha, gravar o log no repositório
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tail -c 60000 build-out.txt > build-out-tail.txt || cp build-out.txt build-out-tail.txt
+          gh api -X PUT "repos/${{ github.repository }}/contents/ci-logs/run-${{ github.run_id }}.txt" \
+            -f message="CI log run ${{ github.run_id }} [skip ci]" \
+            -f branch=main \
+            -f content="$(base64 -w0 build-out-tail.txt)"
